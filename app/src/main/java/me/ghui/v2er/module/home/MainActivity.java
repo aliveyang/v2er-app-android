@@ -240,8 +240,11 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
                 case R.id.care_nav_item:
                     Navigator.from(getContext()).to(SpecialCareActivity.class).start();
                     break;
-                case R.id.star_nav_item:
-                    Navigator.from(getContext()).to(StarActivity.class).start();
+                case R.id.star_topic_nav_item:
+                    StarActivity.open(getContext(), 0);
+                    break;
+                case R.id.star_node_nav_item:
+                    StarActivity.open(getContext(), 1);
                     break;
                 case R.id.setting_nav_item:
                     Navigator.from(getContext()).to(Page.SETTING).start();

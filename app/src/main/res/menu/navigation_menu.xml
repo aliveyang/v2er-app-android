@@ -11,9 +11,13 @@
             android:icon="@drawable/follow_nav_item"
             android:title="特别关注" />
         <item
-            android:id="@+id/star_nav_item"
+            android:id="@+id/star_topic_nav_item"
             android:icon="@drawable/star_nav_item"
-            android:title="收藏" />
+            android:title="收藏主题" />
+        <item
+            android:id="@+id/star_node_nav_item"
+            android:icon="@drawable/star_nav_item"
+            android:title="收藏节点" />
     </group>
     <group
         android:id="@+id/secondary"

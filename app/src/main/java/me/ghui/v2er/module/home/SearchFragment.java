@@ -60,7 +60,7 @@ public class SearchFragment extends BaseFragment<SearchContract.IPresenter> impl
 
     private static final int SEARCH_ENGINE_SOV2EX = 0;
     private static final int SEARCH_ENGINE_GOOGLE = 1;
-    private int mCurrentSearchEngine = SEARCH_ENGINE_SOV2EX;
+    private int mCurrentSearchEngine = SEARCH_ENGINE_GOOGLE;
 
     public static SearchFragment newInstance() {
         Bundle args = new Bundle();
@@ -96,6 +96,11 @@ public class SearchFragment extends BaseFragment<SearchContract.IPresenter> impl
         mResultRecyV.setAdapter(mResultAdapter);
         mResultRecyV.setOnLoadMoreListener(this);
         mResultAdapter.setOnItemClickListener(this);
+        
+        // Set default search engine to Google
+        mSearchIcon.setImageResource(R.drawable.ic_search);
+        mSearchEt.setHint("Powered by Google");
+        mResultRecyV.setVisibility(View.GONE);
 
         mSearchEt.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
