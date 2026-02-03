@@ -16,6 +16,7 @@ import javax.inject.Inject;
 
 import butterknife.BindView;
 import butterknife.OnClick;
+import butterknife.OnLongClick;
 import me.ghui.v2er.module.topic.TopicActivity;
 import me.ghui.v2er.network.bean.SoV2EXSearchResultInfo;
 import me.ghui.v2er.util.Check;
@@ -57,6 +58,10 @@ public class SearchFragment extends BaseFragment<SearchContract.IPresenter> impl
     @Inject
     LoadMoreRecyclerView.Adapter<SoV2EXSearchResultInfo.Hit> mResultAdapter;
 
+    private static final int SEARCH_ENGINE_SOV2EX = 0;
+    private static final int SEARCH_ENGINE_GOOGLE = 1;
+    private int mCurrentSearchEngine = SEARCH_ENGINE_SOV2EX;
+
     public static SearchFragment newInstance() {
         Bundle args = new Bundle();
         SearchFragment fragment = new SearchFragment();
@@ -94,10 +99,23 @@ public class SearchFragment extends BaseFragment<SearchContract.IPresenter> impl
 
         mSearchEt.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                mResultRecyV.getLayoutManager().scrollToPosition(0);
-                mPresenter.start();
-                Utils.toggleKeyboard(false, mSearchEt);
-                mSearchEt.clearFocus();
+                String query = getQueryStr();
+                if (Check.isEmpty(query)) {
+                    return true;
+                }
+                if (mCurrentSearchEngine == SEARCH_ENGINE_GOOGLE) {
+                    // Google search: open in browser
+                    String googleSearchUrl = "https://www.google.com/search?q=site:v2ex.com/t " + query;
+                    Utils.openInBrowser(googleSearchUrl, getContext());
+                    Utils.toggleKeyboard(false, mSearchEt);
+                    mSearchEt.clearFocus();
+                } else {
+                    // sov2ex search: show results in app
+                    mResultRecyV.getLayoutManager().scrollToPosition(0);
+                    mPresenter.start();
+                    Utils.toggleKeyboard(false, mSearchEt);
+                    mSearchEt.clearFocus();
+                }
                 return true;
             }
             return false;
@@ -120,8 +138,21 @@ public class SearchFragment extends BaseFragment<SearchContract.IPresenter> impl
     }
 
     @OnClick(R.id.image_search_icon)
-    void onBackClicked() {
-//        animateSearchbar(false);
+    void onSearchEngineClicked() {
+        toggleSearchEngine();
+    }
+
+    private void toggleSearchEngine() {
+        if (mCurrentSearchEngine == SEARCH_ENGINE_SOV2EX) {
+            mCurrentSearchEngine = SEARCH_ENGINE_GOOGLE;
+            mSearchIcon.setImageResource(R.drawable.ic_search);
+            mSearchEt.setHint("Powered by Google");
+            mResultRecyV.setVisibility(View.GONE);
+        } else {
+            mCurrentSearchEngine = SEARCH_ENGINE_SOV2EX;
+            mSearchIcon.setImageResource(R.drawable.ic_sov2ex);
+            mSearchEt.setHint("Powered by sov2ex");
+        }
     }
 
     @OnClick(R.id.clear_search_img)

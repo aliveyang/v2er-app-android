@@ -39,7 +39,7 @@
                     android:layout_height="@dimen/searchbar_size"
                     android:background="?selectableItemBackgroundBorderless"
                     android:clickable="true"
-                    android:contentDescription="back"
+                    android:contentDescription="search_engine"
                     android:padding="12dp"
                     android:src="@drawable/ic_sov2ex"
                     android:tint="?attr/icon_tint_color" />
