@@ -61,10 +61,11 @@ jobs:
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > app/keystore.jks
           else
-            echo "KEYSTORE_BASE64 is not configured; release APK will be unsigned"
+            echo "KEYSTORE_BASE64 is not configured; fallback APK will use the Android debug signing key"
           fi
 
-      - name: Build release APK
+      - name: Build APK
+        id: build
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -73,16 +74,20 @@ jobs:
           if [ -f app/keystore.jks ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
             echo "Building signed release APK"
             ./gradlew assembleRelease --stacktrace
+            echo "apk_dir=app/build/outputs/apk/release" >> "$GITHUB_OUTPUT"
+            echo "signing_label=release-signed" >> "$GITHUB_OUTPUT"
           else
-            echo "Signing secrets are not configured; building unsigned release APK"
-            ./gradlew assembleRelease -PskipReleaseSigning=true --stacktrace
+            echo "Signing secrets are not configured; building debug-signed APK"
+            ./gradlew assembleDebug --stacktrace
+            echo "apk_dir=app/build/outputs/apk/debug" >> "$GITHUB_OUTPUT"
+            echo "signing_label=debug-signed" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Prepare release assets
         id: assets
         run: |
           mkdir -p release-assets
-          find app/build/outputs/apk/release -name "*.apk" -print -exec cp {} release-assets/ \;
+          find "${{ steps.build.outputs.apk_dir }}" -name "*.apk" -print -exec cp {} release-assets/ \;
 
           if ! find release-assets -name "*.apk" | grep -q .; then
             echo "No APK files were produced"
@@ -91,7 +96,7 @@ jobs:
 
           for apk in release-assets/*.apk; do
             base=$(basename "$apk")
-            mv "$apk" "release-assets/v2er-${{ steps.release.outputs.tag }}-${base}"
+            mv "$apk" "release-assets/v2er-${{ steps.release.outputs.tag }}-${{ steps.build.outputs.signing_label }}-${base}"
           done
 
       - name: Generate release notes
@@ -118,6 +123,9 @@ jobs:
           if [ "$(wc -l < "$NOTES_FILE")" -le 2 ]; then
             echo "Automated release for $TAG." >> "$NOTES_FILE"
           fi
+
+          echo "" >> "$NOTES_FILE"
+          echo "APK signing: ${{ steps.build.outputs.signing_label }}." >> "$NOTES_FILE"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
