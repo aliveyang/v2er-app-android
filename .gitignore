@@ -11,7 +11,7 @@
 *.keystore
 *.base64.txt
 keystore.jks
-app/keystore.jks
+!app/keystore.jks
 
 # Fastlane
 fastlane/report.xml

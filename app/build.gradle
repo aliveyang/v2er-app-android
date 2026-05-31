@@ -1,6 +1,9 @@
 apply plugin: 'com.android.application'
 
-def skipReleaseSigning = project.hasProperty("skipReleaseSigning") && project.property("skipReleaseSigning").toString().toBoolean()
+def envOrDefault(String name, String fallback) {
+    def value = System.getenv(name)
+    return value == null || value.trim().isEmpty() ? fallback : value.trim()
+}
 
 android {
     compileSdk 36
@@ -24,12 +27,11 @@ android {
         }
 
         release {
-            // Release signing requires environment variables to be set
-            // The keystore will be decoded from KEYSTORE_BASE64 in CI/CD
+            // Public fork signing key. Keep this stable so fork builds can upgrade over each other.
             storeFile file("keystore.jks")
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: ""
-            keyAlias System.getenv("KEY_ALIAS")?.trim() ?: "ghui"
-            keyPassword System.getenv("KEY_PASSWORD") ?: ""
+            storePassword envOrDefault("KEYSTORE_PASSWORD", "v2er-fork-signing")
+            keyAlias envOrDefault("KEY_ALIAS", "v2er-fork")
+            keyPassword envOrDefault("KEY_PASSWORD", "v2er-fork-signing")
         }
     }
 
@@ -42,9 +44,7 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            if (!skipReleaseSigning) {
-                signingConfig signingConfigs.release
-            }
+            signingConfig signingConfigs.release
             versionNameSuffix rootProject.ext.app.betaSuffix
         }
     }
