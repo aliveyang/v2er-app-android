@@ -313,6 +313,24 @@ public class Utils {
         customTabsIntent.launchUrl(context, Uri.parse(url));
     }
 
+    public static void openInChrome(String url, Context context) {
+        CustomTabsIntent customTabsIntent = new CustomTabsIntent.Builder()
+                .setToolbarColor(context.getColor(
+                        DarkModelUtils.isDarkMode() ? R.color.colorPrimary_night : R.color.colorPrimary))
+                .enableUrlBarHiding()
+                .setShowTitle(true)
+                .addDefaultShareMenuItem()
+                .setStartAnimations(context, R.anim.open_enter_slide, R.anim.open_exit_slide)
+                .setExitAnimations(context, R.anim.close_enter_slide, R.anim.close_exit_slide)
+                .build();
+        customTabsIntent.intent.setPackage("com.android.chrome");
+        try {
+            customTabsIntent.launchUrl(context, Uri.parse(url));
+        } catch (ActivityNotFoundException e) {
+            openInBrowser(url, context);
+        }
+    }
+
     /**
      * get App versionCode
      *

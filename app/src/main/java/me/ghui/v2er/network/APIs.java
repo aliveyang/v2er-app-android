@@ -112,8 +112,11 @@ public interface APIs {
     Observable<NodeStarInfo> nodeStarInfo();
 
     @Html
-    @GET("/")
+    @GET("/planes")
     Observable<NodesNavInfo> nodesNavInfo();
+
+    @GET("/planes")
+    Observable<ResponseBody> nodesNavHtml();
 
 
     @Html

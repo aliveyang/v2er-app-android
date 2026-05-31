@@ -41,8 +41,7 @@
                     android:clickable="true"
                     android:contentDescription="search_engine"
                     android:padding="12dp"
-                    android:src="@drawable/ic_sov2ex"
-                    android:tint="?attr/icon_tint_color" />
+                    android:src="@drawable/ic_google_search" />
 
                 <EditText
                     android:id="@+id/search_edit_text"
@@ -52,7 +51,7 @@
                     android:contentDescription="@string/acc_search_edittext"
                     android:layout_weight="1"
                     android:gravity="center_vertical"
-                    android:hint="Powered by sov2ex"
+                    android:hint="Powered by Google"
                     android:imeOptions="actionSearch"
                     android:paddingLeft="4dp"
                     android:paddingRight="4dp"

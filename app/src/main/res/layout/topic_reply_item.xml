@@ -26,6 +26,30 @@
         app:layout_constraintTop_toTopOf="@id/reply_avatar_img"
         tools:text="ghui" />
 
+    <ImageView
+        android:id="@+id/reply_thx_img"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/acc_thanks"
+        android:padding="3dp"
+        android:src="@drawable/love_normal_icon"
+        app:layout_constraintLeft_toRightOf="@id/reply_user_name_tv"
+        app:layout_constraintTop_toTopOf="@id/reply_user_name_tv" />
+
+    <TextView
+        android:id="@+id/reply_thx_tv"
+        style="@style/BodyText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="?attr/bodyTextColor"
+        app:layout_constraintBottom_toBottomOf="@id/reply_thx_img"
+        app:layout_constraintLeft_toRightOf="@id/reply_thx_img"
+        app:layout_constraintTop_toTopOf="@id/reply_thx_img"
+        tools:text="3" />
+
     <TextView
         android:id="@+id/reply_user_tag_tv"
         style="@style/smallText"
@@ -39,7 +63,7 @@
         android:paddingBottom="2dp"
         android:text="楼主"
         android:textSize="@dimen/tinyTinyTextSize"
-        app:layout_constraintLeft_toRightOf="@id/reply_user_name_tv"
+        app:layout_constraintLeft_toRightOf="@id/reply_thx_tv"
         app:layout_constraintTop_toTopOf="@id/reply_user_name_tv" />
 
     <TextView
@@ -63,33 +87,10 @@
         android:paddingBottom="4dp"
         android:textIsSelectable="true"
         app:layout_constraintLeft_toLeftOf="@id/reply_user_name_tv"
-        app:layout_constraintRight_toLeftOf="@id/reply_thx_img"
-        app:layout_constraintTop_toBottomOf="@id/reply_avatar_img"
-        tools:text="TextView" />
-
-    <ImageView
-        android:id="@+id/reply_thx_img"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginRight="12dp"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:padding="3dp"
-        android:contentDescription="@string/acc_thanks"
-        android:src="@drawable/love_normal_icon"
-        android:tint="?attr/icon_tint_color"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="@id/reply_avatar_img" />
-
-    <TextView
-        android:id="@+id/reply_thx_tv"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:paddingBottom="4dp"
-        android:textColor="?attr/icon_tint_color"
-        app:layout_constraintRight_toLeftOf="@id/reply_thx_img"
-        app:layout_constraintTop_toTopOf="@id/reply_thx_img"
-        tools:text="1" />
+        app:layout_constraintTop_toBottomOf="@id/reply_avatar_img"
+        android:layout_marginRight="12dp"
+        tools:text="TextView" />
 
     <ImageView
         android:id="@+id/more_menu_img"

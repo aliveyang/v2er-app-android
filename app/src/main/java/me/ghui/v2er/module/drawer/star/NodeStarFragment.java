@@ -20,6 +20,7 @@ import me.ghui.v2er.module.base.BaseFragment;
 import me.ghui.v2er.module.node.NodeTopicActivity;
 import me.ghui.v2er.network.bean.NodeInfo;
 import me.ghui.v2er.network.bean.NodeStarInfo;
+import me.ghui.v2er.util.UserUtils;
 import me.ghui.v2er.widget.BaseRecyclerView;
 
 /**
@@ -82,7 +83,11 @@ public class NodeStarFragment extends BaseFragment<NodeStarContract.IPresenter> 
     @Override
     protected void lazyLoad() {
         if (mNodeStarInfo == null) {
-            super.lazyLoad();
+            if (UserUtils.isLogin()) {
+                super.lazyLoad();
+            } else {
+                mPresenter.start();
+            }
         }
     }
 

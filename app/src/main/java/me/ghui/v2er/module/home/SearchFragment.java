@@ -2,6 +2,7 @@ package me.ghui.v2er.module.home;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.net.Uri;
 import android.os.Bundle;
 import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -10,7 +11,6 @@ import android.view.ViewAnimationUtils;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.ImageView;
-
 
 import javax.inject.Inject;
 
@@ -97,10 +97,7 @@ public class SearchFragment extends BaseFragment<SearchContract.IPresenter> impl
         mResultRecyV.setOnLoadMoreListener(this);
         mResultAdapter.setOnItemClickListener(this);
         
-        // Set default search engine to Google
-        mSearchIcon.setImageResource(R.drawable.ic_search);
-        mSearchEt.setHint("Powered by Google");
-        mResultRecyV.setVisibility(View.GONE);
+        updateSearchEngineUi();
 
         mSearchEt.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
@@ -109,13 +106,10 @@ public class SearchFragment extends BaseFragment<SearchContract.IPresenter> impl
                     return true;
                 }
                 if (mCurrentSearchEngine == SEARCH_ENGINE_GOOGLE) {
-                    // Google search: open in browser
-                    String googleSearchUrl = "https://www.google.com/search?q=site:v2ex.com/t " + query;
-                    Utils.openInBrowser(googleSearchUrl, getContext());
+                    Utils.openInChrome(buildGoogleSearchUrl(query), getContext());
                     Utils.toggleKeyboard(false, mSearchEt);
                     mSearchEt.clearFocus();
                 } else {
-                    // sov2ex search: show results in app
                     mResultRecyV.getLayoutManager().scrollToPosition(0);
                     mPresenter.start();
                     Utils.toggleKeyboard(false, mSearchEt);
@@ -150,14 +144,33 @@ public class SearchFragment extends BaseFragment<SearchContract.IPresenter> impl
     private void toggleSearchEngine() {
         if (mCurrentSearchEngine == SEARCH_ENGINE_SOV2EX) {
             mCurrentSearchEngine = SEARCH_ENGINE_GOOGLE;
-            mSearchIcon.setImageResource(R.drawable.ic_search);
+        } else {
+            mCurrentSearchEngine = SEARCH_ENGINE_SOV2EX;
+        }
+        updateSearchEngineUi();
+    }
+
+    private void updateSearchEngineUi() {
+        if (mCurrentSearchEngine == SEARCH_ENGINE_GOOGLE) {
+            mSearchIcon.setImageResource(R.drawable.ic_google_search);
+            mSearchIcon.setColorFilter(null);
             mSearchEt.setHint("Powered by Google");
             mResultRecyV.setVisibility(View.GONE);
         } else {
-            mCurrentSearchEngine = SEARCH_ENGINE_SOV2EX;
             mSearchIcon.setImageResource(R.drawable.ic_sov2ex);
+            mSearchIcon.setColorFilter(Theme.getColor(R.attr.icon_tint_color, getContext()));
             mSearchEt.setHint("Powered by sov2ex");
         }
+    }
+
+    private String buildGoogleSearchUrl(String query) {
+        return new Uri.Builder()
+                .scheme("https")
+                .authority("www.google.com")
+                .path("search")
+                .appendQueryParameter("q", "site:v2ex.com/t " + query)
+                .build()
+                .toString();
     }
 
     @OnClick(R.id.clear_search_img)

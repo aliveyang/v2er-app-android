@@ -14,6 +14,7 @@ public class NodesNavConstract {
     }
 
     public interface IPresenter extends BaseContract.IPresenter {
+        void refresh();
 
     }
 

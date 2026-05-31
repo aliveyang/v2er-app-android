@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/page_bg_color"
+    android:orientation="vertical">
+
+    <EditText
+        android:id="@+id/node_nav_search_et"
+        style="@style/SearchInput"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/searchbar_size"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginRight="16dp"
+        android:hint="搜索节点"
+        android:imeOptions="actionSearch"
+        android:paddingLeft="4dp"
+        android:paddingRight="4dp"
+        android:singleLine="true" />
+
+    <me.ghui.v2er.widget.BaseRecyclerView
+        android:id="@+id/base_recyclerview"
+        style="@style/BaseRecyclerView"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingTop="8dp" />
+</LinearLayout>

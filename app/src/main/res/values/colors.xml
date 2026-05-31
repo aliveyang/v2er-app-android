@@ -12,6 +12,7 @@
     <color name="colorAccent">#555555</color>
     <color name="bodyTextColor">#555555</color>
     <color name="hintTextColor">#a3a1a1</color>
+    <color name="reply_love_color">#FF4B4B</color>
     <color name="white">@android:color/white</color>
     <color name="ripple_color">#d4d4d4</color>
     <color name="button_background_color">#3A3636</color>

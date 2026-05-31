@@ -41,6 +41,7 @@ import me.ghui.v2er.module.base.BaseActivity;
 import me.ghui.v2er.module.create.CreateTopicActivity;
 import me.ghui.v2er.module.drawer.care.SpecialCareActivity;
 import me.ghui.v2er.module.drawer.dailyhot.DailyHotActivity;
+import me.ghui.v2er.module.drawer.star.NodeStarFragment;
 import me.ghui.v2er.module.drawer.star.StarActivity;
 import me.ghui.v2er.module.login.LoginActivity;
 import me.ghui.v2er.module.settings.UserManualActivity;
@@ -69,10 +70,11 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
     private static final String PAGE_ONE_DATA = KEY("page_one_data");
     private static final String PAGE_TWO_DATA = KEY("page_two_data");
     private static final String PAGE_THREE_DATA = KEY("page_three_data");
+    private static final String PAGE_FOUR_DATA = KEY("page_four_data");
     private static final String TOPIC_IS_APPBAR_EXPANDED = KEY("toolbar_is_appbar_expanded");
 
     public static boolean isAlive;
-    private final String[] TAB_TITLES = {" 全部", "消息", "节点"};
+    private final String[] TAB_TITLES = {" 全部", "消息", "节点", "收藏"};
     @BindView(R.id.left_draw_layout)
     DrawerLayout mDrawerLayout;
     @BindView(R.id.navigationview_main)
@@ -90,6 +92,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
     private NewsFragment mNewsFragment;
     private MsgFragment mMsgFragment;
     private NodesNavFragment mNavFragment;
+    private NodeStarFragment mNodeStarFragment;
     private View mNavHeaderView;
     private ImageView mAvatarImg;
     private TextView mUserNameTv;
@@ -315,7 +318,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
 
         TAB_TITLES[0] = TabInfo.getSelectTab().title;
         mViewPager.setAdapter(new SlidePagerAdapter(getSupportFragmentManager()));
-        mViewPager.setOffscreenPageLimit(2);
+        mViewPager.setOffscreenPageLimit(3);
         mSlidingTabLayout.setViewPager(mViewPager, TAB_TITLES);
         mSlidingTabLayout.setOnTabSelectListener(this);
         configNewsTabTitle();
@@ -336,6 +339,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
                 .putExtra(PAGE_ONE_DATA, mNewsFragment.getRestoreData())
                 .putExtra(PAGE_TWO_DATA, mMsgFragment.getRestoreData())
                 .putExtra(PAGE_THREE_DATA, mNavFragment.getRestoreData())
+                .putExtra(PAGE_FOUR_DATA, mNodeStarFragment.getRestoreData())
                 .reload();
     }
 
@@ -595,6 +599,8 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
                 return mMsgFragment;
             case 2:
                 return mNavFragment;
+            case 3:
+                return mNodeStarFragment;
         }
         return null;
     }
@@ -672,6 +678,11 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
                     restoreData = (BaseHomeFragment.RestoreData) getIntent().getSerializableExtra(PAGE_THREE_DATA);
                     fragment = NodesNavFragment.newInstance(restoreData);
                     break;
+                case 3:
+                    NodeStarFragment.RestoreData nodeStarRestoreData = (NodeStarFragment.RestoreData) getIntent()
+                            .getSerializableExtra(PAGE_FOUR_DATA);
+                    fragment = NodeStarFragment.newInstance(nodeStarRestoreData);
+                    break;
             }
             return fragment;
         }
@@ -688,6 +699,9 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
                     break;
                 case 2:
                     mNavFragment = (NodesNavFragment) fragment;
+                    break;
+                case 3:
+                    mNodeStarFragment = (NodeStarFragment) fragment;
                     break;
             }
             return fragment;

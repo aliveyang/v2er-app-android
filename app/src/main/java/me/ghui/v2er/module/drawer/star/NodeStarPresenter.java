@@ -19,7 +19,11 @@ public class NodeStarPresenter implements NodeStarContract.IPresenter {
 
     @Override
     public void start() {
-        if (UserUtils.notLoginAndProcessToLogin(true, mView.getContext())) return;
+        if (!UserUtils.isLogin()) {
+            mView.hideLoading();
+            mView.toast("登录后才能查看收藏");
+            return;
+        }
         APIService.get()
                 .nodeStarInfo()
                 .compose(mView.rx())

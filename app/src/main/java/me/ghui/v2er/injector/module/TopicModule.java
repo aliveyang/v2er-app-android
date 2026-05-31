@@ -105,9 +105,9 @@ public class TopicModule {
                     holder.setOnLongClickListener(v -> {
                         onThxClickListener.onClick(v);
                         return true;
-                    }, R.id.reply_thx_img);
+                    }, R.id.reply_thx_img, R.id.reply_thx_tv);
                 } else {
-                    holder.setOnClickListener(onThxClickListener, R.id.reply_thx_img);
+                    holder.setOnClickListener(onThxClickListener, R.id.reply_thx_img, R.id.reply_thx_tv);
                 }
 
                 holder.setOnClickListener(v -> mView.onItemMoreMenuClick(holder.index()), R.id.more_menu_img);
