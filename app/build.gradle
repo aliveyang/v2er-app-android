@@ -1,5 +1,7 @@
 apply plugin: 'com.android.application'
 
+def skipReleaseSigning = project.hasProperty("skipReleaseSigning") && project.property("skipReleaseSigning").toString().toBoolean()
+
 android {
     compileSdk 36
     buildToolsVersion "36.0.0"
@@ -40,7 +42,9 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            if (!skipReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             versionNameSuffix rootProject.ext.app.betaSuffix
         }
     }

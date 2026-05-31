@@ -1,969 +1,135 @@
-name: Release
+name: GitHub Release
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'config.gradle'
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to release (e.g., v1.0.0)'
+      tag:
+        description: 'Release tag, for example v2.3.16'
         required: true
         type: string
-      track:
-        description: 'Play Store release track'
-        required: false
-        type: choice
-        default: 'beta'
-        options:
-          - internal
-          - alpha
-          - beta
-          - production
-      status:
-        description: 'Play Store release status'
-        required: false
-        type: choice
-        default: 'draft'
-        options:
-          - draft
-          - completed
 
 permissions:
   contents: write
 
 jobs:
-  prepare:
-    name: Prepare Release
+  github-release:
+    name: Build APK and Create GitHub Release
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      version_code: ${{ steps.version_info.outputs.version_code }}
-      should_release: ${{ steps.check_version.outputs.should_release }}
-      
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 2  # Need history for version comparison
-        token: ${{ secrets.GITHUB_TOKEN }}
-      
-    - name: Check version change
-      id: check_version
-      if: github.event_name == 'push'
-      run: |
-        # Get current version from config.gradle with error handling
-        CURRENT_VERSION=$(grep versionName config.gradle | sed -E 's/.*versionName:[[:space:]]*"([^"]+)".*/\1/' || echo "")
-        CURRENT_CODE=$(grep versionCode config.gradle | sed -E 's/.*versionCode:[[:space:]]*([0-9]+).*/\1/' || echo "")
-        
-        # Validate extraction was successful
-        if [ -z "$CURRENT_VERSION" ] || [ -z "$CURRENT_CODE" ]; then
-          echo "❌ Error: Failed to extract version information from config.gradle"
-          echo "CURRENT_VERSION='$CURRENT_VERSION', CURRENT_CODE='$CURRENT_CODE'"
-          echo "should_release=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        
-        # Validate CURRENT_CODE is a valid number
-        if ! [[ "$CURRENT_CODE" =~ ^[0-9]+$ ]]; then
-          echo "❌ Error: Version code is not a valid number: $CURRENT_CODE"
-          echo "should_release=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        
-        # Get previous version - handle first commit case
-        if git rev-parse HEAD~1 >/dev/null 2>&1; then
-          git show HEAD~1:config.gradle > prev_config.gradle 2>/dev/null || echo "No previous config.gradle"
-          if [ -f prev_config.gradle ]; then
-            PREV_VERSION=$(grep versionName prev_config.gradle | sed -E 's/.*versionName:[[:space:]]*"([^"]+)".*/\1/' || echo "")
-            PREV_CODE=$(grep versionCode prev_config.gradle | sed -E 's/.*versionCode:[[:space:]]*([0-9]+).*/\1/' || echo "0")
-            rm prev_config.gradle
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Resolve release tag
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
           else
-            PREV_VERSION=""
-            PREV_CODE="0"
+            TAG="${GITHUB_REF_NAME}"
           fi
-        else
-          # First commit in repo
-          PREV_VERSION=""
-          PREV_CODE="0"
-        fi
-        
-        # Validate PREV_CODE is a valid number (default to 0 if not)
-        if ! [[ "$PREV_CODE" =~ ^[0-9]+$ ]]; then
-          PREV_CODE="0"
-        fi
-        
-        echo "Previous: v$PREV_VERSION (code: $PREV_CODE)"
-        echo "Current: v$CURRENT_VERSION (code: $CURRENT_CODE)"
-        
-        # Check if version increased
-        if [ "$CURRENT_CODE" -gt "$PREV_CODE" ]; then
-          echo "✅ Version increased from $PREV_VERSION to $CURRENT_VERSION"
-          echo "should_release=true" >> $GITHUB_OUTPUT
-          echo "version=v$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "version_code=$CURRENT_CODE" >> $GITHUB_OUTPUT
-        else
-          echo "ℹ️ No version increase detected"
-          echo "should_release=false" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        
-    - name: Determine version
-      id: version
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          VERSION="${{ github.event.inputs.version }}"
-          echo "should_release=true" >> $GITHUB_OUTPUT
-        elif [ "${{ steps.check_version.outputs.should_release }}" = "true" ]; then
-          VERSION="${{ steps.check_version.outputs.version }}"
-        else
-          echo "No release needed"
-          exit 0
-        fi
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "Version: $VERSION"
-        
-    - name: Extract version code
-      id: version_info
-      run: |
-        # Use version code from check_version step if available, otherwise extract it
-        if [ -n "${{ steps.check_version.outputs.version_code }}" ]; then
-          VERSION_CODE="${{ steps.check_version.outputs.version_code }}"
-        else
-          # Only extract if not already available (for workflow_dispatch)
+
+          if ! echo "$TAG" | grep -Eq '^v[0-9]+(\.[0-9]+){1,3}([-+][0-9A-Za-z.-]+)?$'; then
+            echo "Release tag must look like v2.3.16, got: $TAG"
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
           VERSION_CODE=$(grep "versionCode:" config.gradle | sed -E 's/.*versionCode:[[:space:]]*([0-9]+).*/\1/')
-        fi
-        echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
-        echo "Version Code: $VERSION_CODE"
 
-    - name: Validate CHANGELOG.md
-      id: validate_changelog
-      run: |
-        # Get version without 'v' prefix for matching
-        VERSION="${{ steps.version.outputs.version }}"
-        VERSION_NUMBER="${VERSION#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
 
-        echo "Checking for changelog entry for version: $VERSION_NUMBER"
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: gradle
 
-        # Check if CHANGELOG.md exists
-        if [ ! -f "CHANGELOG.md" ]; then
-          echo "❌ Error: CHANGELOG.md not found!"
-          echo "Please create CHANGELOG.md with an entry for version $VERSION_NUMBER"
-          exit 1
-        fi
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
-        # Check if changelog has entry for this version (with optional build number)
-        if grep -qE "^##[[:space:]]+v?${VERSION_NUMBER}([[:space:]]+\(Build[[:space:]]+[0-9]+\))?[[:space:]]*$" CHANGELOG.md; then
-          echo "✅ Changelog entry found for version $VERSION_NUMBER"
-          echo "changelog_valid=true" >> $GITHUB_OUTPUT
-        else
-          echo "❌ Error: No changelog entry found for version $VERSION_NUMBER"
-          echo ""
-          echo "Please add an entry to CHANGELOG.md:"
-          echo ""
-          echo "## v$VERSION_NUMBER (Build ${{ steps.version_info.outputs.version_code }})"
-          echo "1. Feature/Fix: Description of changes"
-          echo ""
-          echo "Available versions in CHANGELOG.md:"
-          grep -E "^##[[:space:]]+v?[0-9]+\.[0-9]+\.[0-9]+" CHANGELOG.md || echo "  (none found)"
-          exit 1
-        fi
-
-    - name: Create and push tag
-      if: steps.check_version.outputs.should_release == 'true' && github.event_name == 'push'
-      id: create_tag
-      run: |
-        TAG_NAME="${{ steps.version.outputs.version }}"
-        
-        # Check if tag already exists
-        if git ls-remote --tags origin | grep -q "refs/tags/${TAG_NAME}$"; then
-          echo "⚠️ Tag $TAG_NAME already exists, skipping tag creation"
-          echo "tag_created=false" >> $GITHUB_OUTPUT
-          echo "tag_exists=true" >> $GITHUB_OUTPUT
-        else
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Create annotated tag
-          git tag -a "${TAG_NAME}" -m "Release ${TAG_NAME} (version code: ${{ steps.version_info.outputs.version_code }})"
-          git push origin "${TAG_NAME}"
-          
-          echo "🏷️ Created and pushed tag: ${TAG_NAME}"
-          echo "tag_created=true" >> $GITHUB_OUTPUT
-          echo "tag_exists=false" >> $GITHUB_OUTPUT
-        fi
-
-  build-apk:
-    name: Build Release APK
-    needs: prepare
-    if: needs.prepare.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-      
-    - name: Set up JDK 17
-      uses: actions/setup-java@v5
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: gradle
-        
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-      
-    - name: Decode Keystore
-      if: ${{ vars.ENABLE_SIGNING == 'true' && env.KEYSTORE_BASE64 != '' }}
-      env:
-        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-      run: |
-        echo "$KEYSTORE_BASE64" | base64 --decode > app/keystore.jks
-        
-    - name: Debug keystore info
-      if: ${{ vars.ENABLE_SIGNING == 'true' }}
-      run: |
-        echo "Keystore file exists: $([ -f app/keystore.jks ] && echo 'Yes' || echo 'No')"
-        echo "Keystore size: $([ -f app/keystore.jks ] && ls -la app/keystore.jks | awk '{print $5}' || echo 'N/A')"
-        echo "Key alias configured: ${{ secrets.KEY_ALIAS != '' && 'Yes' || 'No' }}"
-        
-    - name: Build release APK
-      run: |
-        if [ "${{ vars.ENABLE_SIGNING }}" = "true" ] && [ -f "app/keystore.jks" ]; then
-          echo "Building signed release APK"
-          echo "Using key alias: ${{ secrets.KEY_ALIAS }}"
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/keystore.jks \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
-        else
-          echo "Building unsigned release APK"
-          ./gradlew assembleRelease --stacktrace
-        fi
-        
-    - name: Clean up keystore
-      if: always()
-      run: |
-        rm -f app/keystore.jks
-        
-    - name: Upload release APK
-      uses: actions/upload-artifact@v6
-      with:
-        name: release-apk
-        path: app/build/outputs/apk/**/*.apk
-        retention-days: 30
-        
-    - name: APK Summary
-      run: |
-        echo "## APK Build Results :package:" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        APK_PATH=$(find app/build/outputs/apk -name "*.apk" | grep -E "release" | head -1)
-        if [ -f "$APK_PATH" ]; then
-          APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
-          echo "- APK Size: $APK_SIZE" >> $GITHUB_STEP_SUMMARY
-          echo "- APK Name: \`$(basename "$APK_PATH")\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Signed: ${{ vars.ENABLE_SIGNING == 'true' && 'Yes' || 'No' }}" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "No APK found" >> $GITHUB_STEP_SUMMARY
-        fi
-
-  build-aab:
-    name: Build Release Bundle
-    needs: prepare
-    if: needs.prepare.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-      
-    - name: Set up JDK 17
-      uses: actions/setup-java@v5
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: gradle
-        
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-      
-    - name: Decode Keystore
-      if: ${{ vars.ENABLE_SIGNING == 'true' && env.KEYSTORE_BASE64 != '' }}
-      env:
-        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-      run: |
-        echo "$KEYSTORE_BASE64" | base64 --decode > app/keystore.jks
-        
-    - name: Build release bundle
-      run: |
-        if [ "${{ vars.ENABLE_SIGNING }}" = "true" ] && [ -f "app/keystore.jks" ]; then
-          echo "Building signed release bundle"
-          ./gradlew bundleRelease \
-            -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/keystore.jks \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
-        else
-          echo "Skipping bundle build - signing not configured"
-        fi
-        
-    - name: Generate debug symbols
-      if: ${{ vars.ENABLE_SIGNING == 'true' }}
-      run: |
-        echo "Checking for debug symbols..."
-        find app/build/outputs -name "*.zip" -type f | grep -i debug || echo "No debug symbol zips found"
-        find app/build/outputs -name "*symbols*" -type f || echo "No symbol files found"
-        ls -la app/build/outputs/bundle/release/ || true
-        
-    - name: Clean up keystore
-      if: always()
-      run: |
-        rm -f app/keystore.jks
-        
-    - name: Upload release bundle
-      if: ${{ vars.ENABLE_SIGNING == 'true' }}
-      uses: actions/upload-artifact@v6
-      with:
-        name: release-bundle
-        path: |
-          app/build/outputs/bundle/**/*.aab
-          app/build/outputs/mapping/release/mapping.txt
-        retention-days: 30
-
-  release:
-    name: Create GitHub Release
-    needs: [prepare, build-apk, build-aab]
-    if: needs.prepare.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-      
-    - name: Download APK artifact
-      uses: actions/download-artifact@v7
-      with:
-        name: release-apk
-        path: release-artifacts/
-        
-    - name: Download AAB artifact
-      if: ${{ vars.ENABLE_SIGNING == 'true' }}
-      uses: actions/download-artifact@v7
-      with:
-        name: release-bundle
-        path: release-artifacts/
-      continue-on-error: true
-      
-    - name: Prepare release assets
-      id: assets
-      run: |
-        # Find APK
-        APK_PATH=$(find release-artifacts -name "*.apk" | grep -E "release" | head -1)
-        if [ -f "$APK_PATH" ]; then
-          APK_NAME="v2er-${{ needs.prepare.outputs.version }}.apk"
-          mv "$APK_PATH" "$APK_NAME"
-          echo "apk_path=$APK_NAME" >> $GITHUB_OUTPUT
-        fi
-        
-        # Find AAB
-        AAB_PATH=$(find release-artifacts -name "*.aab" 2>/dev/null | head -1)
-        if [ -f "$AAB_PATH" ]; then
-          AAB_NAME="v2er-${{ needs.prepare.outputs.version }}.aab"
-          mv "$AAB_PATH" "$AAB_NAME"
-          echo "aab_path=$AAB_NAME" >> $GITHUB_OUTPUT
-        fi
-        
-    - name: Generate changelog
-      id: changelog
-      run: |
-        # Extract changelog from CHANGELOG.md for current version
-        VERSION="${{ needs.prepare.outputs.version }}"
-        VERSION_NUMBER="${VERSION#v}"
-
-        echo "Extracting changelog for version: $VERSION_NUMBER"
-
-        # Create a temporary file for release notes
-        # NOTE: We use a separate RELEASE_NOTES.md file so we don't overwrite CHANGELOG.md,
-        #       which remains the canonical changelog used as the source input above.
-        RELEASE_NOTES_FILE="RELEASE_NOTES.md"
-
-        # Extract content between current version header and next version header (or ---)
-        awk -v ver="$VERSION_NUMBER" '
-          BEGIN { found=0; printing=0 }
-          /^##[[:space:]]+v?[0-9]+\.[0-9]+\.[0-9]+/ {
-            if (found && printing) { exit }
-            if (match($0, "^##[[:space:]]+v?" ver "([[:space:]]|\\(|$)")) { found=1; printing=1; next }
-          }
-          /^---/ { if (printing) exit }
-          printing { print }
-        ' CHANGELOG.md > /tmp/raw_changelog.txt
-
-        # Format for GitHub Release
-        echo "## What's Changed" > "$RELEASE_NOTES_FILE"
-        echo "" >> "$RELEASE_NOTES_FILE"
-
-        # Process each line and categorize
-        features=""
-        fixes=""
-        improvements=""
-
-        while IFS= read -r line; do
-          # Skip empty lines
-          [ -z "$line" ] && continue
-
-          # Extract type and description
-          if echo "$line" | grep -qE "^[0-9]+\.[[:space:]]+Feature:"; then
-            desc=$(echo "$line" | sed -E 's/^[0-9]+\.[[:space:]]+Feature:[[:space:]]*//')
-            features="${features}* ${desc}\n"
-          elif echo "$line" | grep -qE "^[0-9]+\.[[:space:]]+Fix:"; then
-            desc=$(echo "$line" | sed -E 's/^[0-9]+\.[[:space:]]+Fix:[[:space:]]*//')
-            fixes="${fixes}* ${desc}\n"
-          elif echo "$line" | grep -qE "^[0-9]+\.[[:space:]]+Improvement:"; then
-            desc=$(echo "$line" | sed -E 's/^[0-9]+\.[[:space:]]+Improvement:[[:space:]]*//')
-            improvements="${improvements}* ${desc}\n"
-          elif echo "$line" | grep -qE "^[0-9]+\.[[:space:]]+Breaking:"; then
-            desc=$(echo "$line" | sed -E 's/^[0-9]+\.[[:space:]]+Breaking:[[:space:]]*//')
-            features="${features}* **BREAKING**: ${desc}\n"
-          fi
-        done < /tmp/raw_changelog.txt
-
-        # Write categorized sections
-        if [ -n "$features" ]; then
-          echo "### New Features" >> "$RELEASE_NOTES_FILE"
-          echo -e "$features" >> "$RELEASE_NOTES_FILE"
-        fi
-
-        if [ -n "$fixes" ]; then
-          echo "### Bug Fixes" >> "$RELEASE_NOTES_FILE"
-          echo -e "$fixes" >> "$RELEASE_NOTES_FILE"
-        fi
-
-        if [ -n "$improvements" ]; then
-          echo "### Improvements" >> "$RELEASE_NOTES_FILE"
-          echo -e "$improvements" >> "$RELEASE_NOTES_FILE"
-        fi
-
-        # Add full changelog link
-        LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-        if [ -n "$LAST_TAG" ]; then
-          echo "" >> "$RELEASE_NOTES_FILE"
-          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LAST_TAG}...${{ needs.prepare.outputs.version }}" >> "$RELEASE_NOTES_FILE"
-        fi
-
-        echo "Generated release notes:"
-        cat "$RELEASE_NOTES_FILE"
-        
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ needs.prepare.outputs.version }}
-        name: Release ${{ needs.prepare.outputs.version }}
-        body_path: RELEASE_NOTES.md
-        draft: false
-        prerelease: false
-        files: |
-          ${{ steps.assets.outputs.apk_path }}
-          ${{ steps.assets.outputs.aab_path }}
-        fail_on_unmatched_files: false
-
-  play-store-upload:
-    name: Upload to Play Store
-    needs: [prepare, build-aab]
-    if: ${{ (needs.prepare.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch') && vars.ENABLE_PLAY_STORE_UPLOAD == 'true' && vars.ENABLE_SIGNING == 'true' }}
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-      
-    - name: Download AAB artifact
-      uses: actions/download-artifact@v7
-      with:
-        name: release-bundle
-        path: release-artifacts/
-        
-    - name: Find bundle and symbols
-      id: find-files
-      run: |
-        AAB_PATH=$(find release-artifacts -name "*.aab" | head -1)
-        echo "aab_path=$AAB_PATH" >> $GITHUB_OUTPUT
-        
-        # Look for debug symbols
-        SYMBOLS_PATH=$(find release-artifacts -name "native-debug-symbols.zip" 2>/dev/null | head -1)
-        if [ -n "$SYMBOLS_PATH" ]; then
-          echo "symbols_path=$SYMBOLS_PATH" >> $GITHUB_OUTPUT
-          echo "Found debug symbols at: $SYMBOLS_PATH"
-        else
-          echo "No debug symbols found"
-        fi
-        
-        # Look for ProGuard/R8 mapping file
-        MAPPING_PATH=$(find release-artifacts -name "mapping.txt" 2>/dev/null | head -1)
-        if [ -n "$MAPPING_PATH" ]; then
-          echo "mapping_path=$MAPPING_PATH" >> $GITHUB_OUTPUT
-          echo "Found ReTrace mapping file at: $MAPPING_PATH"
-        else
-          echo "No ReTrace mapping file found"
-        fi
-        
-    - name: Determine release track and status
-      id: release-config
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          TRACK="${{ github.event.inputs.track }}"
-          STATUS="${{ github.event.inputs.status }}"
-        else
-          # Default for tag pushes - use beta (public test track)
-          TRACK="beta"
-          STATUS="completed"
-        fi
-        echo "track=$TRACK" >> $GITHUB_OUTPUT
-        echo "status=$STATUS" >> $GITHUB_OUTPUT
-        echo "Deploying to track: $TRACK with status: $STATUS"
-        
-    - name: Create whatsnew directory
-      run: |
-        mkdir -p whatsnew
-
-        # Google Play whatsnew character limit
-        MAX_CHARS=500
-
-        CURRENT_VERSION="${{ needs.prepare.outputs.version }}"
-        VERSION_NUMBER="${CURRENT_VERSION#v}"
-
-        # Feedback headers
-        FEEDBACK_HEADER_EN="Feedback: https://v2er.app/help"
-        FEEDBACK_HEADER_ZH="唯一问题反馈渠道:https://v2er.app/help"
-
-        # Function to extract changelog for a version from CHANGELOG.md
-        extract_version_changelog() {
-          local version="$1"
-          awk -v ver="$version" '
-            BEGIN { found=0; printing=0 }
-            /^##[[:space:]]+v?[0-9]+\.[0-9]+\.[0-9]+/ {
-              if (found && printing) { exit }
-              if (match($0, "^##[[:space:]]+v?" ver "([[:space:]]|\\(|$)")) { found=1; printing=1; next }
-            }
-            /^---/ { if (printing) exit }
-            printing { print }
-          ' CHANGELOG.md
-        }
-
-        # Function to format changelog for Google Play (bullet points)
-        format_for_google_play() {
-          local content="$1"
-          echo "$content" | while IFS= read -r line; do
-            [ -z "$line" ] && continue
-            # Convert "1. Feature: xxx" to "• xxx"
-            if echo "$line" | grep -qE "^[0-9]+\.[[:space:]]+(Feature|Fix|Improvement|Breaking):"; then
-              desc=$(echo "$line" | sed -E 's/^[0-9]+\.[[:space:]]+(Feature|Fix|Improvement|Breaking):[[:space:]]*//')
-              echo "• $desc"
-            fi
-          done
-        }
-
-        # Get all versions from CHANGELOG.md (up to 3)
-        VERSIONS=($(grep -E "^##[[:space:]]+v?[0-9]+\.[0-9]+\.[0-9]+" CHANGELOG.md | sed -E 's/^##[[:space:]]+v?([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -3))
-        echo "Found versions in CHANGELOG.md: ${VERSIONS[*]}"
-
-        # Build whatsnew content
-        build_whatsnew() {
-          local header="$1"
-          local max_chars="$2"
-          local content=""
-          content=$(printf '%s\n\nV2er %s\n\n' "$header" "$CURRENT_VERSION")
-          current_len=${#content}
-          for i in "${!VERSIONS[@]}"; do
-            version="${VERSIONS[$i]}"
-            raw_changelog=$(extract_version_changelog "$version")
-            formatted=$(format_for_google_play "$raw_changelog")
-            if [ -z "$formatted" ]; then
-              continue
-            fi
-            if [ "$i" -eq 0 ]; then
-              version_section="$formatted"
-            else
-              version_section=$(printf '\n--- v%s ---\n%s' "$version" "$formatted")
-            fi
-            section_len=${#version_section}
-            if [ $((current_len + section_len)) -le "$max_chars" ]; then
-              content="${content}${version_section}"
-              current_len=$((current_len + section_len))
-            else
-              break
-            fi
-          done
-          echo "$content"
-        }
-
-        # Generate English whatsnew
-        build_whatsnew "$FEEDBACK_HEADER_EN" "$MAX_CHARS" > whatsnew/whatsnew-en-US
-
-        # Generate Chinese whatsnew (same content, different header)
-        build_whatsnew "$FEEDBACK_HEADER_ZH" "$MAX_CHARS" > whatsnew/whatsnew-zh-CN
-
-        # Show generated content
-        echo "=== English whatsnew ($(wc -c < whatsnew/whatsnew-en-US) chars) ==="
-        cat whatsnew/whatsnew-en-US
-        echo ""
-        echo "=== Chinese whatsnew ($(wc -c < whatsnew/whatsnew-zh-CN) chars) ==="
-        cat whatsnew/whatsnew-zh-CN
-        
-    - name: Upload to Play Store (with debug symbols)
-      if: steps.find-files.outputs.symbols_path != ''
-      uses: r0adkll/upload-google-play@v1
-      with:
-        serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
-        packageName: me.ghui.v2er
-        releaseFiles: ${{ steps.find-files.outputs.aab_path }}
-        track: ${{ steps.release-config.outputs.track }}
-        status: ${{ steps.release-config.outputs.status }}
-        debugSymbols: ${{ steps.find-files.outputs.symbols_path }}
-        mappingFile: ${{ steps.find-files.outputs.mapping_path }}
-        whatsNewDirectory: whatsnew/
-      continue-on-error: true
-      id: upload-with-symbols
-        
-    - name: Upload to Play Store (without debug symbols)
-      if: steps.find-files.outputs.symbols_path == '' || steps.upload-with-symbols.outcome == 'failure'
-      uses: r0adkll/upload-google-play@v1
-      with:
-        serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
-        packageName: me.ghui.v2er
-        releaseFiles: ${{ steps.find-files.outputs.aab_path }}
-        track: ${{ steps.release-config.outputs.track }}
-        status: ${{ steps.release-config.outputs.status }}
-        mappingFile: ${{ steps.find-files.outputs.mapping_path }}
-        whatsNewDirectory: whatsnew/
-        
-    - name: Play Store Upload Summary
-      if: success()
-      run: |
-        echo "## Play Store Upload Complete :rocket:" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- **Version**: ${{ needs.prepare.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Track**: ${{ steps.release-config.outputs.track }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Status**: ${{ steps.release-config.outputs.status }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Package**: me.ghui.v2er" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
-        if [ "${{ steps.release-config.outputs.track }}" = "beta" ]; then
-          echo "### Beta Testing" >> $GITHUB_STEP_SUMMARY
-          echo "This release is now available for beta testing on Google Play." >> $GITHUB_STEP_SUMMARY
-          echo "Beta testers can install it from: [Google Play Beta](https://play.google.com/store/apps/details?id=me.ghui.v2er)" >> $GITHUB_STEP_SUMMARY
-        fi
-
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "[View in Play Console](https://play.google.com/console/u/0/app/me.ghui.v2er)" >> $GITHUB_STEP_SUMMARY
-
-  download-signed-apk:
-    name: Download Google Play Signed APK
-    needs: [prepare, play-store-upload]
-    if: ${{ (needs.prepare.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch') && vars.ENABLE_PLAY_STORE_UPLOAD == 'true' && vars.ENABLE_SIGNING == 'true' }}
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-      
-    - name: Set up Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: '3.x'
-        
-    - name: Install dependencies
-      run: |
-        pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib requests
-        
-    - name: Check and wait for Google Play processing
-      env:
-        PLAY_STORE_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
-      run: |
-        VERSION_CODE="${{ needs.prepare.outputs.version_code }}"
-        PACKAGE_NAME="me.ghui.v2er"
-        
-        # Create Python script to check if APK exists
-        cat > check_apk_exists.py << 'EOF'
-        import json
-        import os
-        import sys
-        import time
-        from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-        
-        def check_apk_exists():
-            try:
-                # Load service account credentials
-                service_account_info = json.loads(os.environ['PLAY_STORE_SERVICE_ACCOUNT_JSON'])
-                credentials = service_account.Credentials.from_service_account_info(
-                    service_account_info,
-                    scopes=['https://www.googleapis.com/auth/androidpublisher']
-                )
-                
-                # Build the service
-                service = build('androidpublisher', 'v3', credentials=credentials)
-                
-                package_name = os.environ['PACKAGE_NAME']
-                version_code = int(os.environ['VERSION_CODE'])
-                
-                print(f"Checking if signed APK exists for {package_name} version {version_code}")
-                
-                # Try to get the generated APKs list
-                result = service.generatedapks().list(
-                    packageName=package_name,
-                    versionCode=version_code
-                ).execute()
-                
-                if 'generatedApks' not in result or not result['generatedApks']:
-                    print(f"No generated APKs found for version {version_code}")
-                    return False
-                
-                print(f"Found {len(result['generatedApks'])} generated APK groups")
-                
-                # Check if we can find a universal APK
-                for apk in result['generatedApks']:
-                    if 'generatedUniversalApk' in apk:
-                        universal_apk = apk['generatedUniversalApk']
-                        download_id = universal_apk.get('downloadId')
-                        if download_id:
-                            print(f"✅ Universal APK found with downloadId: {download_id}")
-                            return True
-                
-                print("❌ No universal APK found")
-                return False
-                
-            except Exception as e:
-                print(f"Error checking APK: {str(e)}")
-                return False
-        
-        if __name__ == "__main__":
-            exists = check_apk_exists()
-            sys.exit(0 if exists else 1)
-        EOF
-        
-        # Set environment variables for the script
-        export PACKAGE_NAME="$PACKAGE_NAME"
-        export VERSION_CODE="$VERSION_CODE"
-        
-        # Check if APK already exists
-        echo "Checking if Google Play signed APK is ready..."
-        if python3 check_apk_exists.py; then
-          echo "✅ APK is already available, skipping wait"
-        else
-          echo "⏳ APK not ready yet, waiting for Google Play to process..."
-          
-          # Smart waiting with periodic checks
-          MAX_WAIT=600  # Maximum 10 minutes
-          CHECK_INTERVAL=30  # Check every 30 seconds
-          elapsed=0
-          
-          while [ $elapsed -lt $MAX_WAIT ]; do
-            sleep $CHECK_INTERVAL
-            elapsed=$((elapsed + CHECK_INTERVAL))
-            
-            echo "⏱️  Waited ${elapsed}s, checking again..."
-            if python3 check_apk_exists.py; then
-              echo "✅ APK is now available after ${elapsed}s"
-              break
-            fi
-            
-            if [ $elapsed -ge $MAX_WAIT ]; then
-              echo "⚠️  Maximum wait time (${MAX_WAIT}s) reached"
-              echo "APK may still be processing, will attempt download anyway"
-            fi
-          done
-        fi
-        
-    # AAB artifact not needed for Google Play signed APK download
-        
-    - name: Download Google Play Signed APK
-      id: download-apk
-      env:
-        PLAY_STORE_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
-      run: |
-        VERSION_NAME="${{ needs.prepare.outputs.version }}"
-        VERSION_CODE="${{ needs.prepare.outputs.version_code }}"
-        PACKAGE_NAME="me.ghui.v2er"
-        
-        # Create Python script to download signed universal APK
-        cat > download_signed_apk.py << 'EOF'
-        import json
-        import os
-        import sys
-        import requests
-        from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-        
-        def download_signed_apk():
-            try:
-                # Load service account credentials
-                service_account_info = json.loads(os.environ['PLAY_STORE_SERVICE_ACCOUNT_JSON'])
-                credentials = service_account.Credentials.from_service_account_info(
-                    service_account_info,
-                    scopes=['https://www.googleapis.com/auth/androidpublisher']
-                )
-                
-                # Build the service
-                service = build('androidpublisher', 'v3', credentials=credentials)
-                
-                package_name = os.environ['PACKAGE_NAME']
-                version_code = int(os.environ['VERSION_CODE'])
-                
-                print(f"Attempting to download signed APK for {package_name} version {version_code}")
-                
-                # Step 1: Get the generated APKs list to find downloadId
-                print("Getting generated APKs list...")
-                result = service.generatedapks().list(
-                    packageName=package_name,
-                    versionCode=version_code
-                ).execute()
-                
-                if 'generatedApks' not in result or not result['generatedApks']:
-                    print("No generated APKs found. App may not be processed yet by Google Play.")
-                    return False
-                
-                print(f"Found {len(result['generatedApks'])} generated APKs")
-                
-                # Debug: Print all APK structures
-                for i, apk in enumerate(result['generatedApks']):
-                    print(f"APK {i} structure:")
-                    for key, value in apk.items():
-                        print(f"  {key}: {value}")
-                    print()
-                
-                # Find universal APK using the correct API structure
-                download_id = None
-                universal_apk = None
-                
-                # First, try to find a universal APK in generatedUniversalApk
-                for apk in result['generatedApks']:
-                    if 'generatedUniversalApk' in apk:
-                        universal_apk = apk['generatedUniversalApk']
-                        download_id = universal_apk.get('downloadId')
-                        print(f"Found universal APK: {universal_apk}")
-                        break
-                
-                if not download_id:
-                    print("No universal APK found")
-                    print("Available APK structure:")
-                    print(json.dumps(result['generatedApks'], indent=2))
-                    return False
-                
-                print(f"Found universal APK with downloadId: {download_id}")
-                
-                # Step 2: Download the APK using the downloadId
-                print("Downloading APK binary...")
-                
-                # Use alt=media to get the actual binary content instead of metadata
-                download_request = service.generatedapks().download(
-                    packageName=package_name,
-                    versionCode=version_code,
-                    downloadId=download_id
-                )
-                # Add alt=media parameter correctly (URL already has query params, so use &)
-                if '?' in download_request.uri:
-                    download_request.uri += '&alt=media'
-                else:
-                    download_request.uri += '?alt=media'
-                
-                output_filename = f"v2er-{os.environ['VERSION_NAME']}_google_play_signed.apk"
-                
-                # Use media download with googleapiclient.http to handle binary content
-                import io
-                from googleapiclient.http import MediaIoBaseDownload
-                
-                file_io = io.BytesIO()
-                downloader = MediaIoBaseDownload(file_io, download_request)
-                
-                done = False
-                while done is False:
-                    status, done = downloader.next_chunk()
-                    if status:
-                        print(f"Download progress: {int(status.progress() * 100)}%")
-                
-                # Write to file
-                with open(output_filename, 'wb') as f:
-                    f.write(file_io.getvalue())
-                
-                print(f"Successfully downloaded: {output_filename}")
-                print(f"apk_path={output_filename}")
-                
-                return True
-                
-            except Exception as e:
-                print(f"Error downloading signed APK: {str(e)}")
-                print("This may be because:")
-                print("1. The app hasn't been processed by Google Play yet")
-                print("2. The version hasn't been released to any track")
-                print("3. API permissions are insufficient")
-                return False
-        
-        if __name__ == "__main__":
-            success = download_signed_apk()
-            sys.exit(0 if success else 1)
-        EOF
-        
-        # Set environment variables for the script
-        export PACKAGE_NAME="$PACKAGE_NAME"
-        export VERSION_CODE="$VERSION_CODE"
-        export VERSION_NAME="$VERSION_NAME"
-        
-        # Run the download script
-        echo "Attempting to download Google Play signed APK..."
-        if python3 download_signed_apk.py > download_output.txt 2>&1; then
-          echo "Successfully downloaded Google Play signed APK"
-          cat download_output.txt
-          
-          # Extract the APK path from output
-          APK_PATH=$(grep "apk_path=" download_output.txt | cut -d'=' -f2)
-          if [ -f "$APK_PATH" ]; then
-            echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
-            echo "found=true" >> $GITHUB_OUTPUT
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > app/keystore.jks
           else
-            echo "APK file not found after download"
-            echo "found=false" >> $GITHUB_OUTPUT
+            echo "KEYSTORE_BASE64 is not configured; release APK will be unsigned"
           fi
-        else
-          echo "Failed to download Google Play signed APK"
-          cat download_output.txt
-          echo "found=false" >> $GITHUB_OUTPUT
-        fi
-        
-    - name: Upload signed APK to GitHub Release
-      if: steps.download-apk.outputs.found == 'true'
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ needs.prepare.outputs.version }}
-        files: |
-          ${{ steps.download-apk.outputs.apk_path }}
-        fail_on_unmatched_files: false
-        
-    - name: Summary
-      if: always()
-      run: |
-        echo "## Google Play Signed APK :package:" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        if [ "${{ steps.download-apk.outputs.found }}" = "true" ]; then
-          echo "✅ **Universal APK generated successfully**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version**: ${{ needs.prepare.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version Code**: ${{ needs.prepare.outputs.version_code }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **File**: v2er-${{ needs.prepare.outputs.version }}_google_play_signed.apk" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Notes" >> $GITHUB_STEP_SUMMARY
-          echo "- This APK is generated from the AAB uploaded to Google Play" >> $GITHUB_STEP_SUMMARY
-          echo "- When installed from Play Store, it will use Google Play's signing certificate" >> $GITHUB_STEP_SUMMARY
-          echo "- The APK has been uploaded to the GitHub Release" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "⚠️ **Google Play signed APK download failed**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "This may be because:" >> $GITHUB_STEP_SUMMARY
-          echo "- Google Play is still processing the upload" >> $GITHUB_STEP_SUMMARY
-          echo "- The version hasn't been released to any track yet" >> $GITHUB_STEP_SUMMARY
-          echo "- API permissions are insufficient" >> $GITHUB_STEP_SUMMARY
-        fi
+
+      - name: Build release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -f app/keystore.jks ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "Building signed release APK"
+            ./gradlew assembleRelease --stacktrace
+          else
+            echo "Signing secrets are not configured; building unsigned release APK"
+            ./gradlew assembleRelease -PskipReleaseSigning=true --stacktrace
+          fi
+
+      - name: Prepare release assets
+        id: assets
+        run: |
+          mkdir -p release-assets
+          find app/build/outputs/apk/release -name "*.apk" -print -exec cp {} release-assets/ \;
+
+          if ! find release-assets -name "*.apk" | grep -q .; then
+            echo "No APK files were produced"
+            exit 1
+          fi
+
+          for apk in release-assets/*.apk; do
+            base=$(basename "$apk")
+            mv "$apk" "release-assets/v2er-${{ steps.release.outputs.tag }}-${base}"
+          done
+
+      - name: Generate release notes
+        run: |
+          TAG="${{ steps.release.outputs.tag }}"
+          VERSION="${TAG#v}"
+          NOTES_FILE="RELEASE_NOTES.md"
+
+          echo "## What's Changed" > "$NOTES_FILE"
+          echo "" >> "$NOTES_FILE"
+
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$VERSION" '
+              BEGIN { found=0; printing=0 }
+              /^##[[:space:]]+v?[0-9]+\.[0-9]+\.[0-9]+/ {
+                if (found && printing) { exit }
+                if (match($0, "^##[[:space:]]+v?" ver "([[:space:]]|\\(|$)")) { found=1; printing=1; next }
+              }
+              /^---/ { if (printing) exit }
+              printing { print }
+            ' CHANGELOG.md >> "$NOTES_FILE"
+          fi
+
+          if [ "$(wc -l < "$NOTES_FILE")" -le 2 ]; then
+            echo "Automated release for $TAG." >> "$NOTES_FILE"
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: V2er ${{ steps.release.outputs.tag }}
+          body_path: RELEASE_NOTES.md
+          files: release-assets/*.apk
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+
+      - name: Clean up keystore
+        if: always()
+        run: rm -f app/keystore.jks
