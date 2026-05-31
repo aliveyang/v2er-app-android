@@ -1,13 +1,13 @@
 package me.ghui.v2er.module.home;
 
 import android.content.Context;
-import android.graphics.drawable.AnimatedVectorDrawable;
 import androidx.recyclerview.widget.GridLayoutManager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.util.TypedValue;
 
@@ -31,13 +31,13 @@ public class HomeFilterMenu implements MultiItemTypeAdapter.OnItemClickListener 
     private BaseRecyclerView mTabsRecyclerView;
     private OnMenuItemClickListener mOnMenuItemClickListener;
     private TextView mTabView;
-    private AnimatedVectorDrawable mUpDrawable;
-    private AnimatedVectorDrawable mDownDrawable;
+    private ImageView mTabArrowView;
 
-    public HomeFilterMenu(ViewGroup container, TextView tabView) {
+    public HomeFilterMenu(ViewGroup container, TextView tabView, ImageView tabArrowView) {
         mContext = container.getContext();
         mContainer = container;
         mTabView = tabView;
+        mTabArrowView = tabArrowView;
     }
 
     public void setOnItemClickListner(OnMenuItemClickListener onItemClickListner) {
@@ -60,11 +60,7 @@ public class HomeFilterMenu implements MultiItemTypeAdapter.OnItemClickListener 
         if (mTabsWrapper == null) {
             initView();
         }
-        if (mDownDrawable == null) {
-            mDownDrawable = (AnimatedVectorDrawable) mTabView.getCompoundDrawables()[2];
-        }
-        mTabView.setCompoundDrawablesWithIntrinsicBounds(null, null, mDownDrawable, null);
-        mDownDrawable.start();
+        updateArrow(true);
         mTabsWrapper.startAnimation(AnimationUtils.loadAnimation(mContext, R.anim.fadein));
         mTabsWrapper.setVisibility(View.VISIBLE);
         mTabsRecyclerView.startAnimation(AnimationUtils.loadAnimation(mContext,
@@ -94,12 +90,7 @@ public class HomeFilterMenu implements MultiItemTypeAdapter.OnItemClickListener 
     }
 
     public void hide() {
-        if (mUpDrawable == null) {
-            mUpDrawable = (AnimatedVectorDrawable) mContext.getResources().getDrawable(R.drawable.animate_triangle_up);
-            mUpDrawable.setTint(Theme.getColor(R.attr.tablayout_selected_color, mContext));
-        }
-        mTabView.setCompoundDrawablesWithIntrinsicBounds(null, null, mUpDrawable, null);
-        mUpDrawable.start();
+        updateArrow(false);
         mTabsRecyclerView.startAnimation(AnimationUtils.loadAnimation(mContext, R.anim.news_tabs_menu_slide_up));
         Animation fadeout = AnimationUtils.loadAnimation(mContext, R.anim.fadeout);
         fadeout.setStartOffset(50);
@@ -121,6 +112,12 @@ public class HomeFilterMenu implements MultiItemTypeAdapter.OnItemClickListener 
         if (mOnMenuItemClickListener != null) {
             mOnMenuItemClickListener.onMenuItemClicked(tabInfo);
         }
+    }
+
+    private void updateArrow(boolean expanded) {
+        if (mTabArrowView == null) return;
+        mTabArrowView.setImageResource(expanded ? R.drawable.vector_triangle_up : R.drawable.vector_triangle_down);
+        mTabArrowView.setColorFilter(Theme.getColor(R.attr.tablayout_selected_color, mContext));
     }
 
     public interface OnMenuItemClickListener {

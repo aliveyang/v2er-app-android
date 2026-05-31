@@ -99,6 +99,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
     private FollowProgressBtn mCheckInBtn;
     private CheckInPresenter mCheckInPresenter;
     private TextView mTab1View;
+    private ImageView mTab1ArrowView;
     private MenuItem mNightMenuItem;
     private SwitchCompat mNightSwitch;
     private HomeFilterMenu mFilterMenu;
@@ -368,8 +369,16 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
         mSlidingTabLayout.setTitleViewVerticalPadding(1, padding);
         mSlidingTabLayout.setTitleViewVerticalPadding(2, padding);
         mTab1View = mSlidingTabLayout.getTitleView(0);
-        mTab1View.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.animate_triangle_down, 0);
-        mTab1View.setCompoundDrawablePadding(ScaleUtils.dp(6));
+        mTab1View.setCompoundDrawables(null, null, null, null);
+        ViewGroup tabContainer = (ViewGroup) mTab1View.getParent();
+        mTab1ArrowView = new ImageView(this);
+        mTab1ArrowView.setImageResource(R.drawable.vector_triangle_down);
+        mTab1ArrowView.setColorFilter(Theme.getColor(R.attr.tablayout_selected_color, this));
+        RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(ScaleUtils.dp(7), ScaleUtils.dp(7));
+        lp.addRule(RelativeLayout.RIGHT_OF, R.id.tv_tab_title);
+        lp.addRule(RelativeLayout.CENTER_VERTICAL);
+        lp.leftMargin = ScaleUtils.dp(6);
+        tabContainer.addView(mTab1ArrowView, lp);
     }
 
     private void initCheckIn() {
@@ -614,9 +623,9 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
     public void onTabSelect(int position) {
         L.d("onTabSelect");
         if (position == 0) {
-            mTab1View.getCompoundDrawables()[2].setTint(Theme.getColor(R.attr.tablayout_selected_color, this));
+            mTab1ArrowView.setColorFilter(Theme.getColor(R.attr.tablayout_selected_color, this));
         } else {
-            mTab1View.getCompoundDrawables()[2].setTint(Theme.getColor(R.attr.tablayout_unselected_color, this));
+            mTab1ArrowView.setColorFilter(Theme.getColor(R.attr.tablayout_unselected_color, this));
             if (mFilterMenu != null && mFilterMenu.isShowing()) {
                 mFilterMenu.hide();
             }
@@ -628,7 +637,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener,
         L.d("onTabReSelect");
         if (position == 0) {
             if (mFilterMenu == null) {
-                mFilterMenu = new HomeFilterMenu(mTabMenuContainer, mTab1View);
+                mFilterMenu = new HomeFilterMenu(mTabMenuContainer, mTab1View, mTab1ArrowView);
                 mFilterMenu.setOnItemClickListner(this);
             }
             mFilterMenu.toggle();

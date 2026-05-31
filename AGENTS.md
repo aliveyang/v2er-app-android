@@ -9,7 +9,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 # Build debug APK
 ./gradlew assembleDebug
 
-# Build release APK (requires GHUI_KEYSTORE_PASSWORD and GHUI_KEY_PASSWORD env vars)
+# Build signed release APK using the committed fork signing key
 ./gradlew assembleRelease
 
 # Clean and rebuild
@@ -119,7 +119,7 @@ The app follows MVP (Model-View-Presenter) architecture with dependency injectio
 
 3. **Build Variants**:
    - `debug`: Standard development build
-   - `release`: Production build (requires keystore passwords)
+   - `release`: Production build signed with the committed fork signing key
 
 4. **Permissions**:
    - Internet access
@@ -136,28 +136,31 @@ The app follows MVP (Model-View-Presenter) architecture with dependency injectio
 ### GitHub Actions
 The project uses GitHub Actions for continuous integration:
 - **CI Workflow**: `.github/workflows/ci.yml` - Runs tests, lint, and builds
-- **Release Workflow**: `.github/workflows/release.yml` - Creates signed releases
+- **Release Workflow**: `.github/workflows/release.yml` - Builds signed APKs and creates GitHub Releases for this fork only
 - **Dependency Updates**: `.github/workflows/dependency-update.yml` - Weekly checks
-- **Trigger**: Push and pull requests to main branch
+- **CI Trigger**: Push and pull requests to main branch
+- **Release Trigger**: Push a `v*` tag, such as `v2.3.16`, or run the workflow manually with a tag input
 - **JDK Version**: 17
 - **Build Commands**: Various gradle tasks for test, lint, and build
 
 ### Release Signing
-Release builds require environment variables:
-- `GHUI_KEYSTORE_PASSWORD`: Keystore password (mapped from GitHub secret `KEYSTORE_PASSWORD`)
-- `GHUI_KEY_PASSWORD`: Key password (mapped from GitHub secret `KEY_PASSWORD`)
-- GitHub secrets also include:
-  - `KEYSTORE_BASE64`: Base64-encoded keystore file
-  - `KEY_ALIAS`: Key alias for signing
+This fork uses a committed public signing key at `app/keystore.jks` so GitHub Releases can publish installable APKs without repository secrets.
+
+- Key alias: `v2er-fork`
+- Store/key password fallback: `v2er-fork-signing`
+- Release APK certificate SHA-256: `5e61dc7f6ff91f79f9cb5a7023800b8ab01c4cdb69b3f34988c73b3e1540af60`
+- Keep this key stable so future fork builds can upgrade over earlier fork builds.
+- If a device has the upstream/Play Store app installed, uninstall it before installing this fork because the package name is the same but the signing certificate differs.
+- `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD` environment variables may override the fallback values, but do not change them for normal fork releases.
 
 ## Project Configuration
 
 ### Version Management
 Versions are centralized in `config.gradle`:
-- compileSdkVersion: 33
+- compileSdkVersion: 36
 - minSdkVersion: 27
-- targetSdkVersion: 33
-- buildToolsVersion: "33.0.0"
+- targetSdkVersion: 36
+- buildToolsVersion: "36.0.0"
 
 ### Gradle Properties
 Key settings in `gradle.properties`:
